@@ -1,0 +1,152 @@
+/* General Styles */
+QWidget {
+    background-color: rgb(4, 3, 26);
+    color: white;
+    font: 600 10pt "Segoe UI";
+}
+
+
+/* Noise Frame */
+QFrame#noise_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    padding: 15px;
+}
+
+QFrame#circle_group_frame,#ellipse_group_frame,#line_group_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    padding: 15px;
+}
+
+
+
+
+/* Filter Frame */
+QFrame#filter_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    padding: 15px;
+
+}
+
+/* Edge Detection Frame */
+QFrame#edge_detection_frame {
+    background-color: rgb(4, 3, 26);
+    padding: 15px;
+}
+
+/* Thresholding Frame */
+QFrame#thresholding_frame {
+    background-color: rgb(4, 3, 26);
+    padding: 15px;
+}
+
+/* Frequency Filter Frame */
+QFrame#frequency_filter_frame {
+    background-color: rgb(4, 3, 26);
+    padding: 15px;
+}
+
+/* Hybrid Image Frame */
+QFrame#hybrid_image_frame {
+    background-color: rgb(4, 3, 26);
+    padding: 15px;
+}
+
+QFrame#active_contour_frame{
+    background-color: rgb(4, 3, 26);
+    padding: 15px;
+}
+
+/* Right Frame */
+QFrame#right_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+}
+
+/* Control Frame */
+QFrame#control_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    padding: 0;
+}
+
+/* Control Buttons Frame */
+QFrame#control_buttons_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    padding: 0;
+}
+
+/* Image Control Buttons Frame */
+QFrame#image_control_buttons_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+}
+
+/* Image Display Frame */
+QFrame#image_display_frame {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+}
+
+/* QLabel */
+QLabel {
+    color: white;
+    font: 600 12pt "Segoe UI";
+}
+
+QLabel#lbl_image,#confusion_label,#roi_label,#template_label,#original_label {
+    background-color: rgb(1, 1, 11);
+    color: white;
+    border: 2px solid rgb(40, 57, 153);
+}
+
+/* QPushButton */
+QPushButton {
+    background-color: rgb(40, 57, 153);
+    border: 2px solid rgb(40, 57, 153);
+    font: 600 10pt "Segoe UI";
+    color: white;
+    min-height: 35px;
+    padding: 5px;
+}
+
+QPushButton:hover {
+    background-color: rgb(60, 77, 173);
+}
+
+QPushButton:pressed {
+    background-color: rgb(20, 37, 113);
+}
+
+/* QComboBox */
+QComboBox {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    color: white;
+}
+
+/* QSpinBox */
+QSpinBox, QDoubleSpinBox {
+    background-color: rgb(4, 3, 26);
+    border: 2px solid rgb(40, 57, 153);
+    color: white;
+    padding: 5px;
+}
+
+/* QTabWidget */
+QTabWidget::pane {
+    border: 2px solid rgb(40, 57, 153);
+}
+
+QTabBar::tab {
+    background: rgb(4, 3, 26);
+    padding: 10px;
+    color: white;
+}
+
+QTabBar::tab:selected {
+    background: rgb(40, 57, 153);
+}
