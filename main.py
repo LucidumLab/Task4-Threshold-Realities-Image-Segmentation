@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QSize
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QFileDialog, QFrame, QTabWidget, QSpacerItem, QSizePolicy,
-    QVBoxLayout, QWidget, QMessageBox, QComboBox, QSpinBox, QHBoxLayout
+    QVBoxLayout, QWidget, QMessageBox, QComboBox, QSpinBox, QHBoxLayout, QDoubleSpinBox
 )
 
 
@@ -165,7 +165,81 @@ class thresholdTab(QWidget):
 
 
 class clusterTab(QWidget):
-    pass
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.layout = QVBoxLayout(self)
+        self.layout.setAlignment(Qt.AlignTop)
+
+        self.function_selector = QComboBox()
+        self.function_selector.addItems(["Shift Segmentation Without Boundaries", "Shift Segmentation With Extra"])
+        self.function_selector.currentTextChanged.connect(self.update_parameter_fields)
+        self.layout.addWidget(self.function_selector)
+
+        self.parameter_container = QFrame()
+        self.parameter_layout = QVBoxLayout(self.parameter_container)
+        self.layout.addWidget(self.parameter_container)
+
+        self.apply_button = QPushButton("Apply Clustering")
+        self.apply_button.clicked.connect(self.apply_clustering_function)
+        self.layout.addWidget(self.apply_button)
+
+        self.update_parameter_fields(self.function_selector.currentText())
+
+    def update_parameter_fields(self, selected_function):
+        for i in reversed(range(self.parameter_layout.count())):
+            widget = self.parameter_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        if selected_function == "Shift Segmentation Without Boundaries":
+            self.add_spinbox("Threshold", 1, 300, 1, default_value=90)
+            self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=2.0)
+            self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1500)
+        elif selected_function == "Shift Segmentation With Extra":
+            self.add_spinbox("Threshold", 1, 300, 1, default_value=150)
+            self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=1.0)
+            self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1000)
+
+    def add_spinbox(self, label_text, min_value, max_value, step, default_value=0):
+        label = QLabel(label_text)
+        spinbox = QDoubleSpinBox() if isinstance(step, float) else QSpinBox()
+        spinbox.setRange(min_value, max_value)
+        spinbox.setSingleStep(step)
+        spinbox.setValue(default_value)
+        self.parameter_layout.addWidget(label)
+        self.parameter_layout.addWidget(spinbox)
+
+    def apply_clustering_function(self):
+        if self.parent.image is None:
+            QMessageBox.warning(self, "Error", "No image loaded. Please load an image first.")
+            return
+
+        selected_function = self.function_selector.currentText()
+        params = {}
+
+        for i in range(0, self.parameter_layout.count(), 2):
+            label_widget = self.parameter_layout.itemAt(i).widget()
+            value_widget = self.parameter_layout.itemAt(i + 1).widget()
+            if isinstance(label_widget, QLabel) and value_widget:
+                param_name = label_widget.text().replace(" ", "_").lower()
+                params[param_name] = value_widget.value()
+
+        try:
+            if selected_function == "Shift Segmentation Without Boundaries":
+                from functions.shift_segmentation_without_boundries import image_segmentation
+                result = image_segmentation(self.parent.image, **params)
+            elif selected_function == "Shift Segmentation With Extra":
+                from functions.shift_segmentation_with_extra import mean_shift_from_array
+                result = mean_shift_from_array(self.parent.image)
+            else:
+                QMessageBox.warning(self, "Error", "Invalid function selected.")
+                return
+
+            self.parent.modified_image = result
+            self.parent.display_image(result)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to apply clustering: {e}")
 
 
 class MainWindow(QMainWindow):
@@ -211,6 +285,7 @@ class MainWindow(QMainWindow):
         tab_widget.setObjectName("tab_widget")
 
         self.threshold_tab = thresholdTab(self)
+
         self.cluster_tab = clusterTab(self)
 
         tab_widget.addTab(self.threshold_tab, "Thresholding")

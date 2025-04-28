@@ -126,6 +126,7 @@ QComboBox {
     background-color: rgb(4, 3, 26);
     border: 2px solid rgb(40, 57, 153);
     color: white;
+    height: 30px;
 }
 
 /* QSpinBox */
