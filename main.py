@@ -12,7 +12,12 @@ from PyQt5.QtWidgets import (
 )
 
 
-from functions.threshold_functions import optimal_threshold, otsu_threshold, spectral_threshold
+from src.thresholding.optimal_thresholding import optimal_threshold
+from src.thresholding.otsu_thresholding import otsu_threshold
+from src.thresholding.spectral_thresholding import spectral_threshold
+
+from src.segmentation.mean_shift_segmentation import mean_shift_segmentation_with_extra
+from src.segmentation.mean_shift_segmentation import mean_shift_segmentation_without_boundries
 
 
 class thresholdTab(QWidget):
@@ -227,11 +232,9 @@ class clusterTab(QWidget):
 
         try:
             if selected_function == "Shift Segmentation Without Boundaries":
-                from functions.shift_segmentation_without_boundries import image_segmentation
-                result = image_segmentation(self.parent.image, **params)
+                result = mean_shift_segmentation_without_boundries(self.parent.image, **params)
             elif selected_function == "Shift Segmentation With Extra":
-                from functions.shift_segmentation_with_extra import mean_shift_from_array
-                result = mean_shift_from_array(self.parent.image)
+                result = mean_shift_segmentation_with_extra(self.parent.image, **params)
             else:
                 QMessageBox.warning(self, "Error", "Invalid function selected.")
                 return
