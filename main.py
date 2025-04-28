@@ -8,17 +8,161 @@ from PyQt5.QtCore import Qt, QSize
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QFileDialog, QFrame, QTabWidget, QSpacerItem, QSizePolicy,
-    QVBoxLayout, QWidget, QMessageBox, QComboBox, QSpinBox, QDoubleSpinBox, QHBoxLayout, QLineEdit, QCheckBox,
-    QStackedWidget, QGridLayout
+    QVBoxLayout, QWidget, QMessageBox, QComboBox, QSpinBox, QHBoxLayout
 )
 
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,QComboBox, QSpinBox,QDoubleSpinBox, QFrame
-)
+
+from functions.threshold_functions import optimal_threshold, otsu_threshold, spectral_threshold
 
 
 class thresholdTab(QWidget):
-    pass
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.layout = QVBoxLayout(self)
+        self.layout.setAlignment(Qt.AlignTop)
+
+        
+        self.function_selector = QComboBox()
+        self.function_selector.addItems(["Optimal Threshold", "Otsu Threshold", "Spectral Threshold"])
+        self.function_selector.currentTextChanged.connect(self.update_parameter_fields)
+        self.layout.addWidget(self.function_selector)
+
+        
+        self.parameter_container = QFrame()
+        self.parameter_layout = QVBoxLayout(self.parameter_container)
+        self.layout.addWidget(self.parameter_container)
+
+        
+        self.apply_button = QPushButton("Apply Threshold")
+        self.apply_button.clicked.connect(self.apply_threshold_function)
+        self.layout.addWidget(self.apply_button)
+
+        
+        self.update_parameter_fields(self.function_selector.currentText())
+
+    def update_parameter_fields(self, selected_function):
+        
+        for i in reversed(range(self.parameter_layout.count())):
+            widget = self.parameter_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        
+        if selected_function in ["Optimal Threshold", "Otsu Threshold", "Spectral Threshold"]:
+            
+            self.add_combobox("Method Type", ["global", "local"])
+            
+            method_type_combobox = self.parameter_container.findChild(QComboBox)
+            if method_type_combobox and method_type_combobox.currentText() == "local":
+                self.add_spinbox("Block Size", 1, 100, 1, default_value=11)
+            
+            if selected_function == "Spectral Threshold":
+                self.add_spinbox("Number of Levels", 2, 20, 1, default_value=3)
+                self.add_spinbox("Offset Range", 1, 50, 1, default_value=10)
+
+    def add_spinbox(self, label_text, min_value, max_value, step, default_value=0):
+        label = QLabel(label_text)
+        spinbox = QSpinBox()
+        spinbox.setRange(min_value, max_value)
+        spinbox.setSingleStep(step)
+        spinbox.setValue(default_value)
+        self.parameter_layout.addWidget(label)
+        self.parameter_layout.addWidget(spinbox)
+
+    def add_combobox(self, label_text, options):
+        label = QLabel(label_text)
+        combobox = QComboBox()
+        combobox.addItems(options)
+        
+        if label_text == "Method Type":
+            combobox.currentTextChanged.connect(self.update_block_size_visibility)
+        self.parameter_layout.addWidget(label)
+        self.parameter_layout.addWidget(combobox)
+
+    def update_block_size_visibility(self, method_type):
+        
+        block_size_label = None
+        block_size_spinbox = None
+        for i in range(self.parameter_layout.count()):
+            widget = self.parameter_layout.itemAt(i).widget()
+            if isinstance(widget, QLabel) and widget.text() == "Block Size":
+                block_size_label = widget
+            elif isinstance(widget, QSpinBox) and i > 0 and self.parameter_layout.itemAt(i-1).widget().text() == "Block Size":
+                block_size_spinbox = widget
+
+        if block_size_label:
+            block_size_label.deleteLater()
+        if block_size_spinbox:
+            block_size_spinbox.deleteLater()
+
+        
+        if method_type == "local":
+            
+            self.add_spinbox("Block Size", 1, 100, 1, default_value=11)
+            
+            for i in range(self.parameter_layout.count()):
+                widget = self.parameter_layout.itemAt(i).widget()
+                if isinstance(widget, QLabel) and widget.text() == "Method Type":
+                    block_size_label = self.parameter_layout.itemAt(self.parameter_layout.count()-2).widget()
+                    block_size_spinbox = self.parameter_layout.itemAt(self.parameter_layout.count()-1).widget()
+                    self.parameter_layout.insertWidget(i+2, block_size_label)
+                    self.parameter_layout.insertWidget(i+3, block_size_spinbox)
+                    break
+
+    def apply_threshold_function(self):
+        if self.parent.image is None:
+            QMessageBox.warning(self, "Error", "No image loaded. Please load an image first.")
+            return
+
+        selected_function = self.function_selector.currentText()
+        params = {}
+
+        
+        for i in range(0, self.parameter_layout.count(), 2):  
+            label_widget = self.parameter_layout.itemAt(i).widget()
+            value_widget = self.parameter_layout.itemAt(i + 1).widget()
+            if isinstance(label_widget, QLabel) and value_widget:
+                param_name = label_widget.text()
+                if isinstance(value_widget, QSpinBox):
+                    params[param_name] = value_widget.value()
+                elif isinstance(value_widget, QComboBox):
+                    params[param_name] = value_widget.currentText()
+
+        
+        mapped_params = {}
+        if "Method Type" in params:
+            mapped_params["method_type"] = params.pop("Method Type")
+        if "Block Size" in params:
+            mapped_params["block_size"] = params.pop("Block Size")
+        if "Number of Levels" in params:
+            mapped_params["num_levels"] = params.pop("Number of Levels")
+        if "Offset Range" in params:
+            mapped_params["offset_range"] = params.pop("Offset Range")
+
+        
+        image = self.parent.image
+        if len(image.shape) == 3:  
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+        try:
+            
+            if selected_function == "Optimal Threshold":
+                result = optimal_threshold(image, **mapped_params)
+            elif selected_function == "Otsu Threshold":
+                result = otsu_threshold(image, **mapped_params)
+            elif selected_function == "Spectral Threshold":
+                result = spectral_threshold(image, **mapped_params)
+            else:
+                QMessageBox.warning(self, "Error", "Invalid function selected.")
+                return
+
+            
+            self.parent.modified_image = result
+            self.parent.display_image(result)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to apply threshold: {str(e)}")
+
 
 class clusterTab(QWidget):
     pass
@@ -30,7 +174,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyQt Image Processing App")
         self.setGeometry(50, 50, 1200, 800)
 
-        # Central widget and layout
+        
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         self.main_layout = QHBoxLayout()
@@ -38,7 +182,7 @@ class MainWindow(QMainWindow):
         
         self.init_ui(self.main_layout)
 
-        # Single data structure to store all parameters
+        
         self.params = {
             "noise_filter": {},
             "filtering": {},
@@ -46,21 +190,18 @@ class MainWindow(QMainWindow):
             "thresholding": {},
             "frequency_filter": {},
             "hybrid_image": {},
-            "shape_detection":{},
-            "active_contour":{}
-            
+            "shape_detection": {},
+            "active_contour": {}
         }
         
-        # self.connect_signals()
-        # Image & Processor Variables
+        
         self.image = None
         self.original_image = None
         self.modified_image = None
-
-
+        self.processors = {}  
 
     def init_ui(self, main_layout):
-        # Left Frame
+        
         left_frame = QFrame()
         left_frame.setFixedWidth(500)
         left_frame.setObjectName("left_frame")
@@ -78,13 +219,13 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(tab_widget)
         main_layout.addWidget(left_frame)
         
-        # Right Frame
+        
         self.right_frame = QFrame()
         self.right_frame.setObjectName("right_frame")
         self.right_layout = QVBoxLayout(self.right_frame)
         self.right_layout.setAlignment(Qt.AlignTop)  
 
-        # Control Buttons Frame
+        
         control_frame = QFrame()
         control_frame.setMaximumHeight(100)
         control_layout = QHBoxLayout(control_frame)
@@ -109,108 +250,79 @@ class MainWindow(QMainWindow):
         self.btn_reset.clicked.connect(self.reset_image)
         control_layout.addWidget(self.btn_reset)
 
-
         self.right_layout.addWidget(control_frame)
 
+        
+        self.image_display_frame = QFrame()  
+        self.image_display_frame.setFixedSize(1390, 880)
+        self.image_display_layout = QVBoxLayout(self.image_display_frame)
+
+        self.lbl_image = QLabel("No Image Loaded")
+        self.lbl_image.setObjectName("lbl_image")
+        self.lbl_image.setAlignment(Qt.AlignCenter)
+        self.image_display_layout.addWidget(self.lbl_image)
+        self.lbl_image.mouseDoubleClickEvent = self.on_image_label_double_click
+
+        self.right_layout.addWidget(self.image_display_frame)
+        self.right_layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         main_layout.addWidget(self.right_frame)
 
-    def update_params(self, tab_name, ui_components):
-        """
-        Update the parameters for a specific tab based on the UI components.
-        
-        Args:
-            tab_name (str): The name of the tab (e.g., "noise_filter").
-            ui_components (dict): A dictionary of UI components and their keys.
-        """
-        print("Updating params for", tab_name)
-        self.params[tab_name] = {}
-        for key, widget in ui_components.items():
-            if isinstance(widget, (QComboBox, QLineEdit)):
-                self.params[tab_name][key] = widget.currentText() if isinstance(widget, QComboBox) else widget.text()
-            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                self.params[tab_name][key] = widget.value()
-            elif isinstance(widget, QCheckBox):
-                self.params[tab_name][key] = widget.isChecked()
-        
-        print(self.params[tab_name])        
-
-    def on_image_label_double_click(self, event):
-        self.load_image()
-    
-
     def display_image(self, img):
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        h, w, ch = img_rgb.shape
-        qimg = QImage(img_rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(qimg)
-        self.lbl_image.setPixmap(pixmap.scaled(self.lbl_image.width(), self.lbl_image.height(), Qt.KeepAspectRatio))
+        """
+        Convert a NumPy image (RGB or grayscale) to QImage and display it in lbl_image.
+        """
+        if img is None:
+            self.lbl_image.setText("No Image Loaded")
+            return
 
-        
-    def load_image(self, hybird = False):
-        """
-        Load an image from disk and display it in the UI.
-        """
-        file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
-        if file_path and hybird == False:
-            self.image = cv2.imread(file_path)
-            self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
-            self.original_image = self.image
-            if self.image is None:
-                QMessageBox.critical(self, "Error", "Failed to load image.")
-                return
-          
-            self.display_image(self.image)
-        elif hybird == True:
-            self.extra_image = cv2.imread(file_path)
-            if self.extra_image is None:
-                QMessageBox.critical(self, "Error", "Failed to load image.")
-                return
-
-            self.display_image(self.extra_image, hybird = True)
-        else:
-            QMessageBox.information(self, "Info", "No file selected.")
-
-    def display_image(self, img, hybrid=False, modified=False):
-        """
-        Convert a NumPy BGR image to QImage and display it in lbl_image.
-        """
-        if len(img.shape) == 3:
-            # Convert BGR to RGB
-            h, w, ch = img.shape
+        if len(img.shape) == 3:  
+            img_rgb = img if img.shape[2] == 3 else cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            h, w, ch = img_rgb.shape
             bytes_per_line = ch * w
-            qimg = QImage(img.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        else:
-            # Grayscale
+            qimg = QImage(img_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        else:  
             h, w = img.shape
-            # Ensure the image is in uint8 format
-            if img.dtype != np.uint8:
-                img = img.astype(np.uint8)
-            # Convert the NumPy array to bytes
-            img_bytes = img.tobytes()
-            qimg = QImage(img_bytes, w, h, w, QImage.Format_Indexed8)
-        
+            qimg = QImage(img.data, w, h, w, QImage.Format_Grayscale8)
+
         pixmap = QPixmap.fromImage(qimg)
         self.lbl_image.setPixmap(pixmap.scaled(
             self.lbl_image.width(), self.lbl_image.height(), Qt.KeepAspectRatio
         ))
-    
 
-    
+    def load_image(self):
+        """
+        Open a file dialog to load an image.
+        """
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
+        if file_path:
+            self.image = cv2.imread(file_path)
+            if self.image is None:
+                QMessageBox.critical(self, "Error", "Failed to load image.")
+                return
+            self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            self.original_image = self.image.copy()
+            self.display_image(self.image)
+        else:
+            QMessageBox.information(self, "Info", "No file selected.")
+
+    def on_image_label_double_click(self, event):
+        self.load_image()
+
     def confirm_edit(self):
         """
         Confirm the edit.
         """
         if self.modified_image is not None:
-            self.image = self.modified_image
+            self.image = self.modified_image.copy()
             for processor in self.processors.values():
                 processor.set_image(self.image)
             self.modified_image = None
             self.display_image(self.image)
         else:
-            raise ValueError("No image available. Load an image first.")
-    
+            QMessageBox.warning(self, "Warning", "No modified image to confirm.")
+
     def discard_edit(self):
         """
         Discard the edit.
@@ -219,19 +331,20 @@ class MainWindow(QMainWindow):
             self.modified_image = None
             self.display_image(self.image)
         else:
-            raise ValueError("No image available. Load an image first.")
+            QMessageBox.warning(self, "Warning", "No modified image to discard.")
+
     def reset_image(self):
         """
         Reset the image to the original.
         """
         if self.original_image is not None:
-            self.image = self.original_image
+            self.image = self.original_image.copy()
             for processor in self.processors.values():
                 processor.set_image(self.image)
             self.modified_image = None
             self.display_image(self.image)
         else:
-            raise ValueError("No original image available. Load an image first.")
+            QMessageBox.warning(self, "Warning", "No original image available.")
 
 def main():
     app = QApplication(sys.argv)
