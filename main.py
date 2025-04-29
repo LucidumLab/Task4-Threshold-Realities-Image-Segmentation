@@ -178,7 +178,11 @@ class clusterTab(QWidget):
         self.layout.setAlignment(Qt.AlignTop)
 
         self.function_selector = QComboBox()
-        self.function_selector.addItems(["Shift Segmentation Without Boundaries", "Shift Segmentation With Extra"])
+        self.function_selector.addItems([
+            "Shift Segmentation Without Boundaries", 
+            "Shift Segmentation With Extra",
+            "Region Growing"
+        ])
         self.function_selector.currentTextChanged.connect(self.update_parameter_fields)
         self.layout.addWidget(self.function_selector)
 
@@ -206,6 +210,8 @@ class clusterTab(QWidget):
             self.add_spinbox("Threshold", 1, 300, 5, default_value=150)
             self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=1.0)
             self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1000)
+        elif selected_function == "Region Growing":
+            self.add_spinbox("Threshold", 1, 50, 1, default_value=9)  # Default threshold for Region Growing
 
     def add_spinbox(self, label_text, min_value, max_value, step, default_value=0):
         label = QLabel(label_text)
@@ -224,7 +230,6 @@ class clusterTab(QWidget):
         selected_function = self.function_selector.currentText()
         params = {}
 
-        # Collect parameter values from input fields
         for i in range(0, self.parameter_layout.count(), 2):
             label_widget = self.parameter_layout.itemAt(i).widget()
             value_widget = self.parameter_layout.itemAt(i + 1).widget()
@@ -244,6 +249,22 @@ class clusterTab(QWidget):
             elif selected_function == "Shift Segmentation With Extra":
                 feature_space, row, col = create_feature_space(image)
                 result = mean_shift_segmentation_with_extra(feature_space, row, col, **params)
+            elif selected_function == "Region Growing":
+                # Import the regionGrow class if not already imported
+                from src.segmentation.region_growing import regionGrow
+                
+                # Create an instance of regionGrow with dummy path
+                mod_region_grower = regionGrow("dummy_path", params["threshold"])
+                
+                # Set image directly from array
+                bgr_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                mod_region_grower.set_image_from_array(bgr_image)
+                
+                # Apply region growing and get the result
+                result, _ = mod_region_grower.ApplyRegionGrow(cv_display=False)
+                
+                # Convert back to RGB for display
+                result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
             else:
                 QMessageBox.warning(self, "Error", "Invalid function selected.")
                 return
@@ -252,7 +273,9 @@ class clusterTab(QWidget):
             self.parent.modified_image = result
             self.parent.display_image(result)
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to apply clustering: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to apply clustering: {str(e)}")
+            import traceback
+            traceback.print_exc()  # This prints the full error for debugging
 
 class MainWindow(QMainWindow):
     def __init__(self):

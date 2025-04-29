@@ -140,3 +140,61 @@ def mean_shift_from_array(image_array):
     feature_space, row, col = create_feature_space(image_array)
     segmented_image = mean_shift_segmentation_with_extra(feature_space, row, col, threshold=150, convergence_threshold=1, max_iterations=1000)
     return segmented_image
+
+import cv2
+import numpy as np
+import time
+import matplotlib.pyplot as plt
+import os
+
+def main():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(script_dir, "butterfly.png")
+    try:
+        image = cv2.imread(image_path)
+        if image is None:
+            raise Exception("Image could not be loaded")
+        
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        plt.figure(figsize=(15, 10))
+        
+        plt.subplot(131)
+        plt.title("Original Image")
+        plt.imshow(image_rgb)
+        plt.axis('off')
+        
+        start_time = time.time()
+        segmented_image1 = mean_shift_segmentation_without_boundries(image, threshold=30)
+        segmented_image1_rgb = cv2.cvtColor(segmented_image1, cv2.COLOR_BGR2RGB)
+        end_time = time.time()
+        print(f"Method 1 execution time: {end_time - start_time:.2f} seconds")
+        
+        start_time = time.time()
+        segmented_image2 = mean_shift_from_array(image)
+        segmented_image2_rgb = cv2.cvtColor(segmented_image2, cv2.COLOR_BGR2RGB)
+        end_time = time.time()
+        print(f"Method 2 execution time: {end_time - start_time:.2f} seconds")
+        
+        plt.subplot(132)
+        plt.title("Method 1: Without Boundaries")
+        plt.imshow(segmented_image1_rgb)
+        plt.axis('off')
+        
+        plt.subplot(133)
+        plt.title("Method 2: With Extra")
+        plt.imshow(segmented_image2_rgb)
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+        
+        cv2.imwrite("segmented_method1.jpg", segmented_image1)
+        cv2.imwrite("segmented_method2.jpg", segmented_image2)
+        print("Segmented images saved as 'segmented_method1.jpg' and 'segmented_method2.jpg'")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    main()
