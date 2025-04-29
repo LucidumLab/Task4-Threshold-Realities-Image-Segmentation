@@ -3,11 +3,9 @@ import cv2
 
 
 def rgb2lab(image):
-    """Convert RGB image to Lab color space using OpenCV."""
     return cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
 
 def initialize_centers(image, S):
-    """Initialize centers on a grid with spacing S."""
     h, w, _ = image.shape
     centers = []
     for y in range(S//2, h, S):
@@ -17,13 +15,13 @@ def initialize_centers(image, S):
     return np.array(centers, dtype=np.float32)
 
 def create_label_distance_maps(h, w):
-    """Create label and distance maps."""
+
     labels = -1 * np.ones((h, w), dtype=np.int32)
     distances = np.full((h, w), np.inf, dtype=np.float32)
     return labels, distances
 
 def compute_distance(center, lab_image, y, x, m, S):
-    """Compute combined color+spatial distance."""
+
     color_diff = lab_image[y, x] - center[2:]
     dc = np.linalg.norm(color_diff)
     ds = np.linalg.norm(np.array([y, x]) - center[:2])
@@ -101,22 +99,12 @@ def extract_features(image, labels, num_superpixels):
     features = []
     centers = []
     
-    for i in range(num_superpixels):
-        
+    for i in range(num_superpixels):     
         mask = (labels == i)
-        
-        
         coords = np.column_stack(np.where(mask))  
-        
-        
-        mean_color = np.mean(image[mask], axis=0)
-        
-        
+        mean_color = np.mean(image[mask], axis=0) 
         center = np.mean(coords, axis=0)
-        
-        
         feature_vector = np.hstack([mean_color, center])
-        
         features.append(feature_vector)
         centers.append(center)
     
@@ -219,39 +207,93 @@ def visualize_clusters(image, labels, superpixel_map, num_clusters):
     plt.show()
 
 
-def cluster_image(image, num_superpixels=100, compactness=10, num_iterations=5, num_clusters=5, linkage='single'):
+# def cluster_image(image, num_superpixels=100, compactness=10, num_iterations=5, num_clusters=5, linkage='single'):
+#     """
+#     Perform SLIC superpixel segmentation + Agglomerative clustering and return the clustered image.
+
+#     Parameters:
+#     - image: input RGB image
+#     - num_superpixels: desired number of superpixels
+#     - compactness: compactness factor for SLIC
+#     - num_iterations: number of SLIC iterations
+#     - num_clusters: number of final clusters after Agglomerative clustering
+#     - linkage: 'single' or 'complete' linkage method
+
+#     Returns:
+#     - clustered_image: image colored by clusters
+#     """
+
+#     labels, _ = slic_superpixels(image, num_superpixels=num_superpixels, m=compactness, num_iterations=num_iterations)
+
+#     features, _ = extract_features(image, labels, np.max(labels)+1)
+
+#     clustering = AgglomerativeClusteringFromScratch(n_clusters=num_clusters, linkage=linkage)
+#     clustering.fit(features)
+
+#     h, w = labels.shape
+#     output_image = np.zeros((h, w, 3), dtype=np.uint8)
+#     colors = np.random.randint(0, 255, size=(num_clusters, 3), dtype=np.uint8)
+
+#     for superpixel_id in range(len(clustering.final_labels)):
+#         mask = (labels == superpixel_id)
+#         output_image[mask] = colors[clustering.final_labels[superpixel_id]]
+
+#     return output_image
+
+def cluster_image(image, num_superpixels=100, compactness=10, num_iterations=5, num_clusters=5, linkage='single', apply_blur=True):
     """
-    Perform SLIC superpixel segmentation + Agglomerative clustering and return the clustered image.
+    Load image, apply preprocessing (contrast enhancement + optional filtering),
+    perform SLIC superpixel segmentation + agglomerative clustering, and return clustered image.
 
     Parameters:
-    - image: input RGB image
-    - num_superpixels: desired number of superpixels
-    - compactness: compactness factor for SLIC
-    - num_iterations: number of SLIC iterations
-    - num_clusters: number of final clusters after Agglomerative clustering
-    - linkage: 'single' or 'complete' linkage method
+    - image_path: path to input image
+    - num_superpixels: number of superpixels for SLIC
+    - compactness: SLIC compactness factor
+    - num_iterations: number of iterations for SLIC
+    - num_clusters: number of output clusters
+    - linkage: agglomerative linkage type ('single' or 'complete')
+    - apply_blur: apply Gaussian blur after contrast enhancement
 
     Returns:
-    - clustered_image: image colored by clusters
+    - output_image: RGB image with cluster-colored superpixels
     """
 
-    labels, _ = slic_superpixels(image, num_superpixels=num_superpixels, m=compactness, num_iterations=num_iterations)
 
-    features, _ = extract_features(image, labels, np.max(labels)+1)
+    # ----- Preprocessing -----
+    lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    lab[:, :, 0] = clahe.apply(lab[:, :, 0])  # Enhance contrast on L-channel
+    enhanced_bgr = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+    # Apply bilateral filter for edge-preserving smoothing
+    filtered = cv2.bilateralFilter(enhanced_bgr, d=9, sigmaColor=75, sigmaSpace=75)
+
+    # Optional Gaussian blur
+    if apply_blur:
+        filtered = cv2.GaussianBlur(filtered, (3, 3), sigmaX=1)
+
+    # Back to RGB for clustering
+    preprocessed_rgb = cv2.cvtColor(filtered, cv2.COLOR_BGR2RGB)
+
+    # ----- Superpixel Segmentation -----
+    labels, _ = slic_superpixels(preprocessed_rgb, num_superpixels=num_superpixels, m=compactness, num_iterations=num_iterations)
+
+    # ----- Feature Extraction & Clustering -----
+    features, _ = extract_features(preprocessed_rgb, labels, np.max(labels) + 1)
 
     clustering = AgglomerativeClusteringFromScratch(n_clusters=num_clusters, linkage=linkage)
     clustering.fit(features)
 
+    # ----- Visualization -----
     h, w = labels.shape
     output_image = np.zeros((h, w, 3), dtype=np.uint8)
     colors = np.random.randint(0, 255, size=(num_clusters, 3), dtype=np.uint8)
 
-    for superpixel_id in range(len(clustering.final_labels)):
-        mask = (labels == superpixel_id)
-        output_image[mask] = colors[clustering.final_labels[superpixel_id]]
+    for sp_id in range(len(clustering.final_labels)):
+        mask = (labels == sp_id)
+        output_image[mask] = colors[clustering.final_labels[sp_id]]
 
     return output_image
-
 
 
 

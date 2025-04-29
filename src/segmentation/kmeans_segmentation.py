@@ -34,6 +34,7 @@ def reconstruct_clustered_image(pixels, assignment, centroids, img_shape):
     clustered_pixels = centroids[assignment].astype(np.uint8)
     clustered_image = clustered_pixels.reshape(img_shape)
     return clustered_image
+
 def cluster_image_kmeans(image, k=5, max_iter=100):
     """
     Perform K-means clustering on an image and return the clustered image.

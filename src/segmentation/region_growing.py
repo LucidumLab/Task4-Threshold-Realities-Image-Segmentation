@@ -56,18 +56,7 @@ class regionGrow():
             if (i, j) != (0, 0) and self.boundaries(x := x0 + i, y := y0 + j)
         ]
     
-    def create_seeds(self):
-        return [
-            [int(self.h/2), int(self.w/2)],
-            [int(self.h/3), int(self.w/3)], [int(2*self.h/3), int(self.w/3)], [int(self.h/3-10), int(self.w/3)],
-            [int(self.h/3), int(2*self.w/3)], [int(2*self.h/3), int(2*self.w/3)], [int(self.h/3-10), int(2*self.w/3)],
-            [int(self.h/3), int(self.w-10)], [int(2*self.h/3), int(self.w-10)], [int(self.h/3-10), int(self.w-10)]
-        ]
-    
     def ApplyRegionGrow(self, cv_display=False):
-        randomseeds = self.create_seeds()
-        np.random.shuffle(randomseeds)
-        
         for x0 in range(self.h):
             for y0 in range(self.w):
                 if self.passedBy[x0, y0] == 0:  
@@ -127,10 +116,10 @@ class regionGrow():
     def color_pixel(self, i, j):
         val = self.passedBy[i][j]
         if val == 0:
-            self.SEGS[i][j] = (0, 0, 0)  # Black for background
+            self.SEGS[i][j] = (0, 0, 0)  
         else:
             # Use a consistent but distinct color for each region
-            np.random.seed(int(val * 100))  # Seed for consistent colors
+            np.random.seed(int(val * 100))  
             r = (val * 35) % 255
             g = (val * 90) % 255
             b = (val * 150) % 255
@@ -173,16 +162,6 @@ if __name__ == "__main__":
     # Default values
     image_path = "Data/mri.jpg"  
     threshold = 9  
-    
-    # Check if command line arguments are provided
-    if len(sys.argv) > 1:
-        image_path = sys.argv[1]
-    
-    if len(sys.argv) > 2:
-        threshold = float(sys.argv[2])
-    
-    print(f"Image path: {image_path}")
-    print(f"Threshold: {threshold}")
     
     # Check if the image file exists
     if not os.path.isfile(image_path):
