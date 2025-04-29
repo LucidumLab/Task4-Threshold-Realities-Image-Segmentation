@@ -12,7 +12,7 @@ def initialize_centers(image, S):
     centers = []
     for y in range(S//2, h, S):
         for x in range(S//2, w, S):
-            centers.append([y, x, *image[y, x]])  # [row, col, L, a, b]
+            centers.append([y, x, *image[y, x]])  
     print(f"new shape of the image matrix: {image.shape}")
     return np.array(centers, dtype=np.float32)
 
@@ -40,7 +40,7 @@ def slic_superpixels(image, num_superpixels=100, m=10, num_iterations=5):
     """
     h, w, _ = image.shape
     N = h * w
-    S = int(np.sqrt(N / num_superpixels))  # grid interval
+    S = int(np.sqrt(N / num_superpixels))  
 
     lab_image = rgb2lab(image)
     centers = initialize_centers(lab_image, S)
@@ -61,7 +61,7 @@ def slic_superpixels(image, num_superpixels=100, m=10, num_iterations=5):
                         distances[y, x] = d
                         labels[y, x] = idx
 
-        # Update centers
+        
         new_centers = np.zeros_like(centers)
         count = np.zeros((centers.shape[0], 1), dtype=np.float32)
 
@@ -93,7 +93,7 @@ def draw_contours(image, labels):
             if (labels[y, x] != labels[y+1, x]) or (labels[y, x] != labels[y, x+1]):
                 mask[y, x] = 255
 
-    contour_img[mask == 255] = [0, 255, 0]  # Green contours
+    contour_img[mask == 255] = [0, 255, 0]  
     return contour_img
 
 
@@ -102,19 +102,19 @@ def extract_features(image, labels, num_superpixels):
     centers = []
     
     for i in range(num_superpixels):
-        # Find the mask of the current superpixel
+        
         mask = (labels == i)
         
-        # Get the coordinates of the pixels in the current superpixel
-        coords = np.column_stack(np.where(mask))  # (y, x) coordinates
         
-        # Get the mean color of the superpixel
+        coords = np.column_stack(np.where(mask))  
+        
+        
         mean_color = np.mean(image[mask], axis=0)
         
-        # Get the center of the superpixel (average coordinates)
+        
         center = np.mean(coords, axis=0)
         
-        # Combine color and position into a feature vector
+        
         feature_vector = np.hstack([mean_color, center])
         
         features.append(feature_vector)
@@ -145,7 +145,7 @@ class AgglomerativeClusteringFromScratch:
             print(f"Merging clusters {cluster_1} and {cluster_2}")
             self.merge_clusters(cluster_1, cluster_2)
 
-        # Remap cluster IDs to 0...n_clusters-1
+        
         unique_cluster_ids = list(self.clusters.keys())
         id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_cluster_ids)}
 
@@ -257,15 +257,56 @@ def cluster_image(image, num_superpixels=100, compactness=10, num_iterations=5, 
 
 
 
+# test
+import numpy as np
+import cv2
+import os
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    # main(image_path, num_clusters=2)
+    try:
+        
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        image_path = os.path.join(script_dir, 'bird.jpg')
+        
+        
+        if not os.path.exists(image_path):
+            
+            image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(script_dir))), 'bird.jpg')
+        
+        if os.path.exists(image_path):
+            print(f"Loading image from: {image_path}")
+            image = cv2.imread(image_path)
+            if image is None:
+                raise ValueError("Failed to load the image")
+        else:
+            print("Image 'bird.jpg' not found, creating a sample image for demonstration")
+            
+            image = np.zeros((300, 300, 3), dtype=np.uint8)
+            
+            cv2.rectangle(image, (50, 50), (200, 200), (0, 0, 255), -1)
+            cv2.circle(image, (225, 225), 50, (0, 255, 0), -1)
+            cv2.rectangle(image, (100, 250), (150, 275), (255, 0, 0), -1)
+        
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        clustered = cluster_image(image, num_superpixels=200, compactness=20, num_clusters=8, linkage='complete')
 
-    # Load an image
-    image = cv2.imread('../../data/bird.jpg')
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    clustered = cluster_image(image, num_superpixels=200, compactness=20, num_clusters=8, linkage='complete')
-
-    plt.imshow(clustered)
-    plt.axis('off')
-    plt.show()
+        plt.subplot(121)
+        plt.title("Original Image")
+        plt.imshow(image)
+        plt.axis('off')
+        
+        plt.subplot(122)
+        plt.title("Clustered Image")
+        plt.imshow(clustered)
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        
+        import traceback
+        traceback.print_exc()

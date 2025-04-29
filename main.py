@@ -27,23 +27,19 @@ class thresholdTab(QWidget):
         self.parent = parent
         self.layout = QVBoxLayout(self)
         self.layout.setAlignment(Qt.AlignTop)
-
         
         self.function_selector = QComboBox()
         self.function_selector.addItems(["Optimal Threshold", "Otsu Threshold", "Spectral Threshold"])
         self.function_selector.currentTextChanged.connect(self.update_parameter_fields)
         self.layout.addWidget(self.function_selector)
-
         
         self.parameter_container = QFrame()
         self.parameter_layout = QVBoxLayout(self.parameter_container)
         self.layout.addWidget(self.parameter_container)
-
         
         self.apply_button = QPushButton("Apply Threshold")
         self.apply_button.clicked.connect(self.apply_threshold_function)
         self.layout.addWidget(self.apply_button)
-
         
         self.update_parameter_fields(self.function_selector.currentText())
 
@@ -101,7 +97,6 @@ class thresholdTab(QWidget):
             block_size_label.deleteLater()
         if block_size_spinbox:
             block_size_spinbox.deleteLater()
-
         
         if method_type == "local":
             
@@ -123,7 +118,6 @@ class thresholdTab(QWidget):
 
         selected_function = self.function_selector.currentText()
         params = {}
-
         
         for i in range(0, self.parameter_layout.count(), 2):  
             label_widget = self.parameter_layout.itemAt(i).widget()
@@ -134,7 +128,6 @@ class thresholdTab(QWidget):
                     params[param_name] = value_widget.value()
                 elif isinstance(value_widget, QComboBox):
                     params[param_name] = value_widget.currentText()
-
         
         mapped_params = {}
         if "Method Type" in params:
@@ -170,7 +163,7 @@ class thresholdTab(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to apply threshold: {str(e)}")
 
 
-class clusterTab(QWidget):
+class SegmentTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
@@ -181,7 +174,9 @@ class clusterTab(QWidget):
         self.function_selector.addItems([
             "Shift Segmentation Without Boundaries", 
             "Shift Segmentation With Extra",
-            "Region Growing"
+            "Region Growing",
+            "K-means Clustering",
+            "Agglomerative Clustering" 
         ])
         self.function_selector.currentTextChanged.connect(self.update_parameter_fields)
         self.layout.addWidget(self.function_selector)
@@ -211,7 +206,16 @@ class clusterTab(QWidget):
             self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=1.0)
             self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1000)
         elif selected_function == "Region Growing":
-            self.add_spinbox("Threshold", 1, 50, 1, default_value=9)  # Default threshold for Region Growing
+            self.add_spinbox("Threshold", 1, 50, 1, default_value=9)
+        elif selected_function == "K-means Clustering":
+            self.add_spinbox("Number of Clusters", 2, 20, 1, default_value=5)
+            self.add_spinbox("Max Iterations", 1, 500, 1, default_value=100)
+        elif selected_function == "Agglomerative Clustering":
+            self.add_spinbox("Number of Superpixels", 50, 500, 10, default_value=200)
+            self.add_spinbox("Compactness", 1, 50, 1, default_value=20)
+            self.add_spinbox("SLIC Iterations", 1, 20, 1, default_value=5)
+            self.add_spinbox("Number of Clusters", 2, 20, 1, default_value=5)
+            self.add_combobox("Linkage Type", ["single", "complete"])
 
     def add_spinbox(self, label_text, min_value, max_value, step, default_value=0):
         label = QLabel(label_text)
@@ -221,6 +225,20 @@ class clusterTab(QWidget):
         spinbox.setValue(default_value)
         self.parameter_layout.addWidget(label)
         self.parameter_layout.addWidget(spinbox)
+
+    def add_combobox(self, label_text, options):
+        label = QLabel(label_text)
+        combobox = QComboBox()
+        combobox.addItems(options)
+        self.parameter_layout.addWidget(label)
+        self.parameter_layout.addWidget(combobox)
+
+    def add_combobox(self, label_text, options):
+        label = QLabel(label_text)
+        combobox = QComboBox()
+        combobox.addItems(options)
+        self.parameter_layout.addWidget(label)
+        self.parameter_layout.addWidget(combobox)
 
     def apply_clustering_function(self):
         if self.parent.image is None:
@@ -235,14 +253,16 @@ class clusterTab(QWidget):
             value_widget = self.parameter_layout.itemAt(i + 1).widget()
             if isinstance(label_widget, QLabel) and value_widget:
                 param_name = label_widget.text().replace(" ", "_").lower()
-                params[param_name] = value_widget.value()
+                if isinstance(value_widget, QComboBox):
+                    params[param_name] = value_widget.currentText()
+                else:
+                    params[param_name] = value_widget.value()
 
-        # Ensure the image is 3D (convert grayscale to RGB if necessary)
+        
         image = self.parent.image
-        if len(image.shape) == 2:  # Grayscale image
+        if len(image.shape) == 2:  
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-        # Apply the selected clustering function
+        
         try:
             if selected_function == "Shift Segmentation Without Boundaries":
                 result = mean_shift_segmentation_without_boundries(image, **params)
@@ -250,39 +270,63 @@ class clusterTab(QWidget):
                 feature_space, row, col = create_feature_space(image)
                 result = mean_shift_segmentation_with_extra(feature_space, row, col, **params)
             elif selected_function == "Region Growing":
-                # Import the regionGrow class if not already imported
                 from src.segmentation.region_growing import regionGrow
                 
-                # Create an instance of regionGrow with dummy path
                 mod_region_grower = regionGrow("dummy_path", params["threshold"])
                 
-                # Set image directly from array
                 bgr_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 mod_region_grower.set_image_from_array(bgr_image)
                 
-                # Apply region growing and get the result
                 result, _ = mod_region_grower.ApplyRegionGrow(cv_display=False)
                 
-                # Convert back to RGB for display
                 result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+            elif selected_function == "K-means Clustering":
+                from src.segmentation.kmeans_segmentation import cluster_image_kmeans
+                
+                k = int(params["number_of_clusters"])
+                max_iter = int(params["max_iterations"])
+                
+                bgr_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                
+                result = cluster_image_kmeans(bgr_image, k=k, max_iter=max_iter)
+                
+                result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+            elif selected_function == "Agglomerative Clustering":
+                from src.segmentation.agglomerative_segmentation import cluster_image
+                
+                num_superpixels = int(params["number_of_superpixels"])
+                compactness = int(params["compactness"])
+                num_iterations = int(params["slic_iterations"])
+                num_clusters = int(params["number_of_clusters"])
+                linkage = params["linkage_type"]
+                
+                
+                QMessageBox.information(self, "Processing", "Agglomerative clustering started. This may take a while...")
+                
+                result = cluster_image(
+                    image,  
+                    num_superpixels=num_superpixels,
+                    compactness=compactness,
+                    num_iterations=num_iterations,
+                    num_clusters=num_clusters,
+                    linkage=linkage
+                )
             else:
                 QMessageBox.warning(self, "Error", "Invalid function selected.")
                 return
-
-            # Update the modified image in the MainWindow
+            
             self.parent.modified_image = result
             self.parent.display_image(result)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to apply clustering: {str(e)}")
             import traceback
-            traceback.print_exc()  # This prints the full error for debugging
+            traceback.print_exc()
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyQt Image Processing App")
         self.setGeometry(50, 50, 1200, 800)
-
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -303,7 +347,6 @@ class MainWindow(QMainWindow):
             "active_contour": {}
         }
         
-        
         self.image = None
         self.original_image = None
         self.modified_image = None
@@ -321,10 +364,10 @@ class MainWindow(QMainWindow):
 
         self.threshold_tab = thresholdTab(self)
 
-        self.cluster_tab = clusterTab(self)
+        self.cluster_tab = SegmentTab(self)
 
         tab_widget.addTab(self.threshold_tab, "Thresholding")
-        tab_widget.addTab(self.cluster_tab, "Clustering")
+        tab_widget.addTab(self.cluster_tab, "Segmentation")
 
         left_layout.addWidget(tab_widget)
         main_layout.addWidget(left_frame)
@@ -334,7 +377,6 @@ class MainWindow(QMainWindow):
         self.right_frame.setObjectName("right_frame")
         self.right_layout = QVBoxLayout(self.right_frame)
         self.right_layout.setAlignment(Qt.AlignTop)  
-
         
         control_frame = QFrame()
         control_frame.setMaximumHeight(100)
@@ -361,10 +403,9 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.btn_reset)
 
         self.right_layout.addWidget(control_frame)
-
         
         self.image_display_frame = QFrame()  
-        self.image_display_frame.setFixedSize(1390, 880)
+        self.image_display_frame.setFixedSize(1370, 880)
         self.image_display_layout = QVBoxLayout(self.image_display_frame)
 
         self.lbl_image = QLabel("No Image Loaded")
