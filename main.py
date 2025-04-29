@@ -18,6 +18,7 @@ from src.thresholding.spectral_thresholding import spectral_threshold
 
 from src.segmentation.mean_shift_segmentation import mean_shift_segmentation_with_extra
 from src.segmentation.mean_shift_segmentation import mean_shift_segmentation_without_boundries
+from src.segmentation.mean_shift_segmentation import create_feature_space
 
 
 class thresholdTab(QWidget):
@@ -198,11 +199,11 @@ class clusterTab(QWidget):
                 widget.deleteLater()
 
         if selected_function == "Shift Segmentation Without Boundaries":
-            self.add_spinbox("Threshold", 1, 300, 1, default_value=90)
+            self.add_spinbox("Threshold", 1, 300, 5, default_value=90)
             self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=2.0)
             self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1500)
         elif selected_function == "Shift Segmentation With Extra":
-            self.add_spinbox("Threshold", 1, 300, 1, default_value=150)
+            self.add_spinbox("Threshold", 1, 300, 5, default_value=150)
             self.add_spinbox("Convergence Threshold", 0.1, 10.0, 0.1, default_value=1.0)
             self.add_spinbox("Max Iterations", 1, 5000, 1, default_value=1000)
 
@@ -223,6 +224,7 @@ class clusterTab(QWidget):
         selected_function = self.function_selector.currentText()
         params = {}
 
+        # Collect parameter values from input fields
         for i in range(0, self.parameter_layout.count(), 2):
             label_widget = self.parameter_layout.itemAt(i).widget()
             value_widget = self.parameter_layout.itemAt(i + 1).widget()
@@ -230,20 +232,27 @@ class clusterTab(QWidget):
                 param_name = label_widget.text().replace(" ", "_").lower()
                 params[param_name] = value_widget.value()
 
+        # Ensure the image is 3D (convert grayscale to RGB if necessary)
+        image = self.parent.image
+        if len(image.shape) == 2:  # Grayscale image
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+        # Apply the selected clustering function
         try:
             if selected_function == "Shift Segmentation Without Boundaries":
-                result = mean_shift_segmentation_without_boundries(self.parent.image, **params)
+                result = mean_shift_segmentation_without_boundries(image, **params)
             elif selected_function == "Shift Segmentation With Extra":
-                result = mean_shift_segmentation_with_extra(self.parent.image, **params)
+                feature_space, row, col = create_feature_space(image)
+                result = mean_shift_segmentation_with_extra(feature_space, row, col, **params)
             else:
                 QMessageBox.warning(self, "Error", "Invalid function selected.")
                 return
 
+            # Update the modified image in the MainWindow
             self.parent.modified_image = result
             self.parent.display_image(result)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to apply clustering: {e}")
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -373,7 +382,7 @@ class MainWindow(QMainWindow):
         Open a file dialog to load an image.
         """
         file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
+        file_path, _ = file_dialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp *.jpeg)")
         if file_path:
             self.image = cv2.imread(file_path)
             if self.image is None:

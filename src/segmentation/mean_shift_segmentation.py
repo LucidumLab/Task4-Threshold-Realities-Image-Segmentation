@@ -87,7 +87,7 @@ def create_feature_space(image):
     D = np.hstack([rgb, ij]).astype(np.float32)
     return D, row, col
 
-def mean_shift_segmentation_with_extra(D, row, col, threshold=30, convergence_thresh=0.01, max_iterations=1000):
+def mean_shift_segmentation_with_extra(D, row, col, threshold=30, convergence_threshold=0.01, max_iterations=1000):
     """Performs mean shift clustering with KD-tree optimization and returns the segmented image."""
     segmented_image = np.zeros((row, col, 3), dtype=np.uint8)
     current_mean_random = True
@@ -117,7 +117,7 @@ def mean_shift_segmentation_with_extra(D, row, col, threshold=30, convergence_th
        
         mean_shift_distance = np.linalg.norm(new_mean - current_mean)
 
-        if mean_shift_distance < convergence_thresh:
+        if mean_shift_distance < convergence_threshold:
             cluster_color = new_mean[:3].astype(np.uint8)
             for idx in below_threshold_indices:
                 r, c = int(D[idx, 3]), int(D[idx, 4])
@@ -138,5 +138,5 @@ def mean_shift_segmentation_with_extra(D, row, col, threshold=30, convergence_th
 def mean_shift_from_array(image_array):
     """Main function: takes a NumPy image array and returns segmented image."""
     feature_space, row, col = create_feature_space(image_array)
-    segmented_image = mean_shift_segmentation_with_extra(feature_space, row, col, threshold=150, convergence_thresh=1, max_iterations=1000)
+    segmented_image = mean_shift_segmentation_with_extra(feature_space, row, col, threshold=150, convergence_threshold=1, max_iterations=1000)
     return segmented_image
